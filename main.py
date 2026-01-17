@@ -1,32 +1,42 @@
 import os
 from llama_zip import LlamaZip
+from huggingface_hub import hf_hub_download
 
-# Path to Llama 3.2 1B model (adjust if your model is in a different location)
-MODEL_PATH = os.path.expanduser("~/.cache/huggingface/hub/models--bartowski--Llama-3.2-1B-Instruct-GGUF/snapshots/*/Llama-3.2-1B-Instruct-Q4_K_M.gguf")
+# Model configuration
+MODELS_DIR = "./models"
+CACHE_DIR = "./models/.cache"
+MODEL_REPO = "bartowski/Llama-3.2-1B-Instruct-GGUF"
+MODEL_FILE = "Llama-3.2-1B-Instruct-Q4_K_M.gguf"
 
-# Try common model locations
-possible_paths = [
-    "./models/Llama-3.2-1B-Instruct-Q4_K_M.gguf",
-    "Llama-3.2-1B-Instruct-Q4_K_M.gguf",
-    "D:/Models/Llama-3.2-1B-Instruct-Q4_K_M.gguf",
-    os.path.expanduser("~/models/Llama-3.2-1B-Instruct-Q4_K_M.gguf"),
-]
+def download_model():
+    """Download the model to local directory if not already present."""
+    model_path = os.path.join(MODELS_DIR, MODEL_FILE)
+    
+    if os.path.exists(model_path):
+        print(f"Model already exists: {model_path}")
+        return model_path
+    
+    print(f"Downloading {MODEL_FILE} from {MODEL_REPO}...")
+    print("This may take a few minutes depending on your connection speed.")
+    
+    # Create directories if they don't exist
+    os.makedirs(MODELS_DIR, exist_ok=True)
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    
+    # Download to local directory with local cache
+    downloaded_path = hf_hub_download(
+        repo_id=MODEL_REPO,
+        filename=MODEL_FILE,
+        local_dir=MODELS_DIR,
+        cache_dir=CACHE_DIR,
+    )
+    
+    print(f"Model downloaded to: {downloaded_path}")
+    return downloaded_path
 
-# Find the model
-model_path = None
-for path in possible_paths:
-    if os.path.exists(path):
-        model_path = path
-        break
-
-if model_path is None:
-    print("Please set the correct path to your Llama 3.2 1B GGUF model:")
-    print("Edit MODEL_PATH in main.py or place the model in one of these locations:")
-    for p in possible_paths:
-        print(f"  - {p}")
-    model_path = input("\nOr enter the path now: ").strip()
-
-print(f"Loading model from: {model_path}")
+# Download/locate the model
+model_path = download_model()
+print(f"Using model: {model_path}")
 print("-" * 60)
 
 # Initialize the compressor with Llama 3.2 1B
