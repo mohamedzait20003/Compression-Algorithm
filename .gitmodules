@@ -1,0 +1,3 @@
+[submodule "llama-zip"]
+	path = llama-zip
+	url = https://github.com/alexbuz/llama-zip.git
