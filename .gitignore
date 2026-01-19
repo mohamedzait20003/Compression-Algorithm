@@ -76,3 +76,6 @@ cython_debug/
 
 # MacOS
 .DS_Store
+
+# Large model files
+models
