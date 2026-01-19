@@ -1,6 +1,8 @@
 import re
+from tqdm import tqdm
 from wordfreq import top_n_list
 from lib.Huffman import Huffman
+from datasets import load_dataset
 from utilities import Compressor, Decompressor
 
 print("=" * 70)
@@ -50,21 +52,33 @@ print("=" * 70 + "\n")
 compressor = Compressor(huffman=huffman, max_words=50)
 decompressor = Decompressor(huffman=huffman)
 
+def load_sentences(max_sentences=None):
+    print(f"Loading DailyDialog dataset")
+    ds = load_dataset(
+        "parquet",
+        data_files={
+            "train": "https://huggingface.co/datasets/roskoN/dailydialog/resolve/refs%2Fconvert%2Fparquet/full/train/0000.parquet",
+            "validation": "https://huggingface.co/datasets/roskoN/dailydialog/resolve/refs%2Fconvert%2Fparquet/full/validation/0000.parquet",
+            "test": "https://huggingface.co/datasets/roskoN/dailydialog/resolve/refs%2Fconvert%2Fparquet/full/test/0000.parquet"
+        }
+    )
+    
+    sentences = []
+    for item in tqdm(ds['train'], desc="Extracting sentences"):
+        utterances = item['utterances']
+        for utterance in utterances:
+            utterance = utterance.strip()
+            if utterance:
+                sentences.append(utterance)
+                if max_sentences and len(sentences) >= max_sentences:
+                    print(f"Extracted {len(sentences)} sentences")
+                    return sentences
+    
+    print(f"Extracted {len(sentences)} sentences from train split")
+    return sentences
+
 # Test messages - varied chat/text scenarios
-test_messages = [
-    "Hello, how are you doing today?",
-    "Thanks for your help!",
-    "See you later",
-    "Good morning everyone",
-    "I will be there in five minutes",
-    "What time is the meeting?",
-    "Please send me the report",
-    "Have a great day!",
-    "The weather is nice today",
-    "Can you help me with this problem?",
-    'Ahmed,Mohamed helped me!',
-    'Ahmed, Mohamed helped me!',
-]
+test_messages = load_sentences(max_sentences=1000)
 
 def tokenize(text: str):
     """Tokenize text into words and punctuation"""
