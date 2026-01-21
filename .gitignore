@@ -76,6 +76,14 @@ cython_debug/
 
 # MacOS
 .DS_Store
+# LLM Models and cache (large files)
+models/
+*.gguf
+*.bin
+*.safetensors
+.cache/
+*/.cache/
+**/.cache/
 
 # Large model files
 models
