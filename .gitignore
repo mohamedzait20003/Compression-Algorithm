@@ -84,3 +84,6 @@ models/
 .cache/
 */.cache/
 **/.cache/
+
+# Large model files
+models
