@@ -1,189 +1,100 @@
-# Text Compression using Huffman Coding
+# Text Compression using Arithmetic Coding
 
-A Python-based text compression system implemented from scratch using **Word-Level Huffman Coding** algorithm, pre-trained on 10,000 most common English words.
+A Python text compression system using **word-level arithmetic coding** for near-entropy compression.
 
 ## Overview
 
-This project implements a lossless compression/decompression system using Huffman coding at the **word level**. Unlike character-level Huffman, this approach:
-- Pre-trains on word frequencies from `wordfreq` package (billions of words corpus)
-- Assigns shorter codes to common words ("the", "is", "you")
-- Achieves **~60% compression** on typical chat messages
-- Eliminates per-message codebook overhead (shared pre-trained codebook)
+This project compresses natural language text by:
+1. Building a word frequency vocabulary from training data
+2. Using arithmetic coding to encode words with near-optimal bit lengths
+3. Achieving ~2.5x compression ratio (~9 bits/word)
 
-## How It Works
+## Results
 
-1. **Pre-train with WordFreq**: Load top 10,000 English words by frequency
-2. **Build Huffman Tree**: Create a binary tree where:
-   - Common words ("the", "is", "you") get shorter codes (3-8 bits)
-   - Rare words get longer codes (12+ bits)
-   - Punctuation and spaces included
-3. **Tokenize Text**: Split into words, punctuation, and whitespace
-4. **Encode**: Replace each token with its Huffman code
-5. **Decode**: Use the pre-trained codebook to reconstruct text
+Tested on 1,000 sentences from the DailyDialog dataset:
 
-## Example
-
-For the text "Hello, how are you?":
-```
-Pre-trained Huffman Codes:
-  ' ': 000          (3 bits - most common)
-  'you': 01101      (5 bits - common word)
-  'how': 011011     (6 bits)
-  'are': 0110110    (7 bits)
-  ',': 0110101      (7 bits)
-  '?': 011010010    (9 bits)
-  'hello': ...      (12 bits - less common)
-
-Original (ASCII): 19 chars × 8 bits = 152 bits
-Huffman encoded:  ~60 bits
-Compression ratio: ~2.5x
-Savings: ~60%
-```
-
-## Features
-
-- **Word-Level Encoding**: Treats words as atomic units, not characters
-- **Pre-trained Codebook**: Uses `wordfreq` (10,000 most common English words)
-- **~60% Compression**: Average savings on typical chat messages
-- **Dependency Injection**: Clean architecture with `HuffmanProtocol`
-- **Lossless**: Perfect reconstruction of original text
+| Metric | Value |
+|--------|-------|
+| Compression ratio | 2.45x |
+| Space savings | 54.5% |
+| Bits per word | 9.19 |
+| Entropy limit | 8.64 bits/word |
+| Vocabulary coverage | 98.9% |
 
 ## Installation
-
-1. Clone or download this repository
-2. Install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Run the demo:
+## Usage
+
+### Quick Start
 
 ```bash
-python main.py
+python compress.py
+```
+
+### Programmatic Usage
+
+```python
+from utilities import TextCompressor, DataLoader
+
+# Load training data
+loader = DataLoader()
+train_data = loader.load_train()
+
+# Train compressor
+compressor = TextCompressor(vocab_path="models/vocab.json")
+compressor.train(train_data)
+
+# Compress text
+text = "Hello, how are you doing today?"
+compressed = compressor.compress(text)
+decompressed = compressor.decompress(compressed)
+
+print(f"Original: {len(text)} bytes")
+print(f"Compressed: {len(compressed)} bytes")
 ```
 
 ## Project Structure
 
 ```
-RA Test/
-├── main.py                    # Demo with 10 test examples and statistics
-├── requirements.txt           # Dependencies (wordfreq)
-├── README.md                  # This file
-├── lib/
-│   ├── __init__.py            # Exports Huffman, HuffmanProtocol
-│   └── Huffman.py             # Core Huffman coding algorithm
+├── compress.py              # Main demo script
+├── requirements.txt         # Dependencies
 ├── utilities/
-│   ├── __init__.py            # Exports Compressor, Decompressor
-│   ├── Compressor.py          # Word-level compression with DI
-│   └── Decompressor.py        # Word-level decompression with DI
+│   ├── __init__.py
+│   ├── compressor.py        # TextCompressor & ArithmeticCoder
+│   └── data_loader.py       # DailyDialog data loader
+└── models/
+    └── vocab.json           # Trained vocabulary
 ```
 
-## Usage
+## How It Works
 
-### Basic Example with Pre-training
+### Arithmetic Coding
 
-```python
-from lib.Huffman import Huffman
-from utilities import Compressor, Decompressor
-from wordfreq import top_n_list
-import re
+Unlike Huffman coding which assigns integer bit codes, arithmetic coding represents an entire message as a single fractional number, achieving compression closer to the theoretical entropy limit.
 
-# Load training data (10,000 most common English words)
-common_words = top_n_list('en', 10000)
+### Word-Level Encoding
 
-# Build training corpus with frequency weights
-training_tokens = []
-for i, word in enumerate(common_words):
-    weight = max(1, (10000 - i) // 100)
-    training_tokens.extend([word] * weight)
+- Common words ("the", "you", "is") → fewer bits
+- Rare words → more bits + fallback encoding
+- Punctuation treated as separate tokens
 
-# Add punctuation
-training_tokens.extend([' '] * 50000)
-training_tokens.extend(['.'] * 5000)
-training_tokens.extend([','] * 4000)
+### Compression Process
 
-# Create and train Huffman model
-huffman = Huffman()
-huffman.train(training_tokens)
+1. **Tokenize**: Split text into words and punctuation
+2. **Map to IDs**: Convert words to vocabulary IDs
+3. **Arithmetic encode**: Compress ID sequence to bits
+4. **Handle unknowns**: Encode out-of-vocabulary words as UTF-8
 
-# Initialize compressor/decompressor with DI
-compressor = Compressor(huffman=huffman, max_words=50)
-decompressor = Decompressor(huffman=huffman)
+## Limitations
 
-# Encode
-text = "Hello, how are you?"
-tokens = re.findall(r'\w+|[^\w\s]|\s+', text.lower())
-encoded = huffman.encode(tokens)
-print(f"Encoded: {len(encoded)} bits")
+The theoretical entropy of the DailyDialog corpus is ~8.64 bits/word. To achieve lower compression (e.g., 7 bits/word), you would need **context-based prediction** (PPM, neural language models) which exploits word-to-word dependencies.
 
-# Decode
-decoded_tokens = huffman.decode(encoded)
-restored = ''.join(decoded_tokens)
-print(f"Restored: {restored}")
-```
+## Requirements
 
-## API Reference
-
-### Compressor Class
-
-| Method | Description |
-|--------|-------------|
-| `__init__(max_words=20)` | Initialize compressor with max word limit |
-| `compress_to_binary(text)` | Compress text with codebook, return binary string |
-| `compress_to_binary_without_codebook(text)` | Compress without codebook (for analysis) |
-| `get_codebook()` | Return the current Huffman codebook |
-| `get_stats(text)` | Return compression statistics dictionary |
-
-### Decompressor Class
-
-| Method | Description |
-|--------|-------------|
-| `decompress(binary_string)` | Decompress binary string (with embedded codebook) |
-| `decompress_with_codebook(binary, codebook)` | Decompress using provided codebook |
-| `get_codebook()` | Return the extracted codebook |
-
-## Compression Statistics
-
-| Metric | Description |
-|--------|-------------|
-| `original_bits` | Size in bits using ASCII encoding (8 bits/char) |
-| `huffman_bits` | Size using Huffman codes (without codebook) |
-| `compressed_bits` | Total size including codebook overhead |
-| `compression_ratio` | original_bits / huffman_bits |
-| `savings_percent` | Percentage reduction in size |
-| `overhead_bits` | Codebook size in bits |
-
-## Performance Results (10 Test Samples)
-
-| Metric | Value |
-|--------|-------|
-| Average Compression Ratio | **2.57x** |
-| Average Savings | **60.2%** |
-| Average Bits per Word | **15.72** |
-| Total Original | 1,944 bits |
-| Total Compressed | 774 bits |
-
-### Sample Results
-
-| Message | Original | Compressed | Savings |
-|---------|----------|------------|--------|
-| "Hello, how are you doing today?" | 248 bits | 106 bits | 57.3% |
-| "Good morning everyone" | 168 bits | 44 bits | 73.8% |
-| "Please send me the report" | 200 bits | 75 bits | 62.5% |
-| "Thanks for your help!" | 168 bits | 67 bits | 60.1% |
-
-## Advantages Over Per-Message Encoding
-
-1. **No Codebook Overhead**: Pre-trained codebook shared between sender/receiver
-2. **Consistent Performance**: Common words always get short codes
-3. **Fast Encoding**: No tree building needed per message
-4. **Scales Well**: Works great for chat applications with many short messages
-
-## Author
-
-Mohamed Zaitoun
-
-## License
-
-MIT License
+- Python 3.10+
+- datasets
+- tqdm
